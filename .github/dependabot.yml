@@ -1,0 +1,29 @@
+version: 2
+updates:
+  # npm 패키지 업데이트
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "bloodmoon3929"  # 여기에 본인의 GitHub 사용자명 입력
+    assignees:
+      - "bloodmoon3929"  # 여기에 본인의 GitHub 사용자명 입력
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+
+  # GitHub Actions 업데이트
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "bloodmoon3929"  # 여기에 본인의 GitHub 사용자명 입력
+    assignees:
+      - "bloodmoon3929"  # 여기에 본인의 GitHub 사용자명 입력
+    commit-message:
+      prefix: "ci"
+      include: "scope"

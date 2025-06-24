@@ -1,5 +1,10 @@
 # 🍽️ 맛집 이상형 월드컵
 
+[![CI/CD Pipeline](https://github.com/gnbup/food-tournament/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/gnbup/food-tournament/actions/workflows/ci-cd.yml)
+[![GitHub Pages](https://img.shields.io/badge/demo-GitHub%20Pages-blue)](https://gnbup.github.io/food-tournament/)
+[![Next.js](https://img.shields.io/badge/Next.js-14.2.3-black)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
+
 현재 위치 기반으로 주변 맛집들을 찾아서 이상형 월드컵을 진행하는 Next.js 웹 애플리케이션입니다.
 
 ## ✨ 주요 기능
@@ -101,6 +106,49 @@ yarn dev
 ## 📄 라이선스
 
 이 프로젝트는 MIT 라이선스 하에 있습니다.
+
+## 🚀 CI/CD 및 배포
+
+이 프로젝트는 GitHub Actions를 사용하여 자동화된 CI/CD 파이프라인을 구축했습니다.
+
+### 파이프라인 단계
+
+1. **CI (지속적 통합)**
+   - 여러 Node.js 버전(18.x, 20.x)에서 테스트
+   - ESLint 코드 린팅 검사
+   - TypeScript 타입 체크
+   - 빌드 테스트
+   - 단위 테스트 실행
+
+2. **CD (지속적 배포)**
+   - main 브랜치에 push시 자동 배포
+   - GitHub Pages로 자동 배포
+   - 정적 사이트 생성 및 호스팅
+
+3. **보안 검사**
+   - Trivy를 사용한 취약점 스캔
+   - GitHub Security 탭에 결과 업로드
+
+### GitHub Secrets 설정
+
+배포를 위해 다음 Secrets를 설정해야 합니다:
+
+```
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+```
+
+**Secrets 설정 방법:**
+1. GitHub 리포지토리로 이동
+2. Settings > Secrets and variables > Actions
+3. "New repository secret" 클릭
+4. Name: `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
+5. Secret: 발급받은 Google Maps API 키 입력
+
+### GitHub Pages 설정
+
+1. 리포지토리 Settings > Pages
+2. Source: "GitHub Actions" 선택
+3. 자동으로 배포 URL 생성: `https://gnbup.github.io/food-tournament/`
 
 ## ⚠️ 주의사항
 
