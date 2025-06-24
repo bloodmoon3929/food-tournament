@@ -1,3 +1,4 @@
+/// <reference types="google.maps" />
 import { Restaurant, LocationData, MenuInfo } from './types';
 
 // 실제 구글 메뉴 정보만 추출하는 함수
@@ -7,7 +8,7 @@ const extractRealMenuInfo = (place: google.maps.places.PlaceResult): MenuInfo =>
   
   // Google Places types에서만 기본 카테고리 추출 (가상 메뉴 없이)
   if (place.types) {
-    const foodTypes = place.types.filter(type => 
+    const foodTypes = place.types.filter((type: string) => 
       ['restaurant', 'food', 'meal_takeaway', 'meal_delivery', 'cafe', 'bakery',
        'bar', 'night_club', 'pizza', 'chinese_restaurant', 'japanese_restaurant',
        'korean_restaurant', 'mexican_restaurant', 'italian_restaurant', 'fast_food',
@@ -15,7 +16,7 @@ const extractRealMenuInfo = (place: google.maps.places.PlaceResult): MenuInfo =>
       ].includes(type)
     );
     
-    foodTypes.forEach(type => {
+    foodTypes.forEach((type: string) => {
       switch(type) {
         case 'cafe': 
           categories.push('카페'); 
@@ -97,8 +98,8 @@ const extractRealMenuInfo = (place: google.maps.places.PlaceResult): MenuInfo =>
   }
   
   return {
-    categories: [...new Set(categories)],
-    cuisine_type: [...new Set(cuisineTypes)],
+    categories: Array.from(new Set(categories)),
+    cuisine_type: Array.from(new Set(cuisineTypes)),
     price_range: priceRange,
     sample_menu: [] // 실제 메뉴가 없으면 빈 배열
   };
@@ -109,10 +110,12 @@ export class RealMenuPlacesService {
   private service: google.maps.places.PlacesService | null = null;
 
   constructor() {
-    // 더미 맵 엘리먼트를 사용해서 PlacesService 초기화
-    const mapDiv = document.createElement('div');
-    this.map = new google.maps.Map(mapDiv);
-    this.service = new google.maps.places.PlacesService(this.map);
+    if (typeof window !== 'undefined' && window.google) {
+      // 더미 맵 엘리먼트를 사용해서 PlacesService 초기화
+      const mapDiv = document.createElement('div');
+      this.map = new window.google.maps.Map(mapDiv);
+      this.service = new window.google.maps.places.PlacesService(this.map);
+    }
   }
 
   async findNearbyRestaurants(
@@ -120,20 +123,20 @@ export class RealMenuPlacesService {
     radius: number = 2000
   ): Promise<Restaurant[]> {
     return new Promise((resolve, reject) => {
-      if (!this.service) {
+      if (!this.service || !window.google) {
         reject('Places service not initialized');
         return;
       }
 
       const request: google.maps.places.PlaceSearchRequest = {
-        location: new google.maps.LatLng(location.lat, location.lng),
+        location: new window.google.maps.LatLng(location.lat, location.lng),
         radius: radius,
         type: 'restaurant',
         keyword: '음식점'
       };
 
-      this.service.nearbySearch(request, async (results, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+      this.service.nearbySearch(request, async (results: google.maps.places.PlaceResult[] | null, status: google.maps.places.PlacesServiceStatus) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
           const restaurants: Restaurant[] = [];
           
           for (const place of results) {
@@ -146,8 +149,8 @@ export class RealMenuPlacesService {
                 
                 // 실제 구글에서 제공하는 메뉴 정보가 있다면 사용
                 if (detailedPlace?.menu) {
-                  menuInfo.sample_menu = detailedPlace.menu.sections?.flatMap(section => 
-                    section.items?.map(item => item.name) || []
+                  menuInfo.sample_menu = detailedPlace.menu.sections?.flatMap((section: any) => 
+                    section.items?.map((item: any) => item.name) || []
                   ) || [];
                 }
                 
@@ -156,7 +159,7 @@ export class RealMenuPlacesService {
                   name: place.name || '',
                   rating: place.rating || 0,
                   priceLevel: place.price_level,
-                  photos: place.photos?.map(photo => 
+                  photos: place.photos?.map((photo: google.maps.places.PlacePhoto) => 
                     photo.getUrl({ maxWidth: 400, maxHeight: 400 })
                   ),
                   vicinity: place.vicinity || '',
@@ -170,7 +173,7 @@ export class RealMenuPlacesService {
                   opening_hours: place.opening_hours,
                   user_ratings_total: place.user_ratings_total,
                   menu: menuInfo,
-                  reviews: detailedPlace?.reviews?.slice(0, 3).map(review => ({
+                  reviews: detailedPlace?.reviews?.slice(0, 3).map((review: google.maps.places.PlaceReview) => ({
                     author_name: review.author_name || '',
                     rating: review.rating || 0,
                     text: review.text || '',
@@ -186,7 +189,7 @@ export class RealMenuPlacesService {
                   name: place.name || '',
                   rating: place.rating || 0,
                   priceLevel: place.price_level,
-                  photos: place.photos?.map(photo => 
+                  photos: place.photos?.map((photo: google.maps.places.PlacePhoto) => 
                     photo.getUrl({ maxWidth: 400, maxHeight: 400 })
                   ),
                   vicinity: place.vicinity || '',
@@ -217,7 +220,7 @@ export class RealMenuPlacesService {
 
   async getPlaceDetailsWithMenu(placeId: string): Promise<any> {
     return new Promise((resolve, reject) => {
-      if (!this.service) {
+      if (!this.service || !window.google) {
         reject('Places service not initialized');
         return;
       }
@@ -232,8 +235,8 @@ export class RealMenuPlacesService {
         ]
       };
 
-      this.service.getDetails(request, (place, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+      this.service.getDetails(request, (place: google.maps.places.PlaceResult | null, status: google.maps.places.PlacesServiceStatus) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
           resolve(place);
         } else {
           reject(`Place details failed: ${status}`);
@@ -248,21 +251,21 @@ export class RealMenuPlacesService {
     radius: number = 2000
   ): Promise<number> {
     return new Promise((resolve, reject) => {
-      if (!this.service) {
+      if (!this.service || !window.google) {
         reject('Places service not initialized');
         return;
       }
 
       const request: google.maps.places.PlaceSearchRequest = {
-        location: new google.maps.LatLng(location.lat, location.lng),
+        location: new window.google.maps.LatLng(location.lat, location.lng),
         radius: radius,
         type: 'restaurant',
         keyword: '음식점'
       };
 
-      this.service.nearbySearch(request, (results, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-          const count = results.filter(place => place.rating && place.rating > 3.5).length;
+      this.service.nearbySearch(request, (results: google.maps.places.PlaceResult[] | null, status: google.maps.places.PlacesServiceStatus) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
+          const count = results.filter((place: google.maps.places.PlaceResult) => place.rating && place.rating > 3.5).length;
           resolve(count);
         } else {
           resolve(0);
@@ -300,7 +303,7 @@ export const getCurrentLocation = (): Promise<LocationData> => {
 
 export const loadGoogleMapsAPI = (): Promise<void> => {
   return new Promise((resolve, reject) => {
-    if (typeof google !== 'undefined' && google.maps) {
+    if (typeof window !== 'undefined' && window.google && window.google.maps) {
       resolve();
       return;
     }
