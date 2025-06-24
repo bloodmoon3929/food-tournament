@@ -13,7 +13,7 @@ export interface Restaurant {
     };
   };
   opening_hours?: {
-    open_now: boolean;
+    open_now?: boolean;
   };
   user_ratings_total?: number;
   menu?: MenuInfo;
