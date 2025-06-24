@@ -1,3 +1,4 @@
+/// <reference types="google.maps" />
 import { Restaurant, LocationData, MenuInfo } from './types';
 
 // 메뉴 정보를 추출하는 헬퍼 함수
@@ -8,7 +9,7 @@ const extractMenuInfo = (place: google.maps.places.PlaceResult): MenuInfo => {
   
   if (place.types) {
     // Google Places types에서 음식 카테고리 추출
-    const foodTypes = place.types.filter(type => 
+    const foodTypes = place.types.filter((type: string) => 
       ['restaurant', 'food', 'meal_takeaway', 'meal_delivery', 'cafe', 'bakery',
        'bar', 'night_club', 'pizza', 'chinese_restaurant', 'japanese_restaurant',
        'korean_restaurant', 'mexican_restaurant', 'italian_restaurant', 'fast_food',
@@ -16,7 +17,7 @@ const extractMenuInfo = (place: google.maps.places.PlaceResult): MenuInfo => {
       ].includes(type)
     );
     
-    foodTypes.forEach(type => {
+    foodTypes.forEach((type: string) => {
       switch(type) {
         case 'cafe': 
           categories.push('카페'); 
@@ -120,8 +121,8 @@ const extractMenuInfo = (place: google.maps.places.PlaceResult): MenuInfo => {
   }
   
   return {
-    categories: [...new Set(categories)], // 중복 제거
-    cuisine_type: [...new Set(cuisineTypes)],
+    categories: Array.from(new Set(categories)), // 중복 제거
+    cuisine_type: Array.from(new Set(cuisineTypes)),
     price_range: priceRange,
     sample_menu: sampleMenu.slice(0, 4) // 최대 4개
   };
@@ -132,10 +133,12 @@ export class PlacesService {
   private service: google.maps.places.PlacesService | null = null;
 
   constructor() {
-    // 더미 맵 엘리먼트를 사용해서 PlacesService 초기화
-    const mapDiv = document.createElement('div');
-    this.map = new google.maps.Map(mapDiv);
-    this.service = new google.maps.places.PlacesService(this.map);
+    if (typeof window !== 'undefined' && window.google) {
+      // 더미 맵 엘리먼트를 사용해서 PlacesService 초기화
+      const mapDiv = document.createElement('div');
+      this.map = new window.google.maps.Map(mapDiv);
+      this.service = new window.google.maps.places.PlacesService(this.map);
+    }
   }
 
   async findNearbyRestaurants(
@@ -167,7 +170,7 @@ export class PlacesService {
                 name: place.name || '',
                 rating: place.rating || 0,
                 priceLevel: place.price_level,
-                photos: place.photos?.map(photo => 
+                photos: place.photos?.map((photo: google.maps.places.PlacePhoto) => 
                   photo.getUrl({ maxWidth: 400, maxHeight: 400 })
                 ),
                 vicinity: place.vicinity || '',
@@ -183,7 +186,7 @@ export class PlacesService {
                 menu: menuInfo
               };
             })
-            .sort((a, b) => b.rating - a.rating); // 평점 높은 순으로 정렬
+            .sort((a: Restaurant, b: Restaurant) => b.rating - a.rating); // 평점 높은 순으로 정렬
 
           resolve(restaurants);
         } else {
@@ -199,21 +202,21 @@ export class PlacesService {
     radius: number = 2000
   ): Promise<number> {
     return new Promise((resolve, reject) => {
-      if (!this.service) {
+      if (!this.service || !window.google) {
         reject('Places service not initialized');
         return;
       }
 
       const request: google.maps.places.PlaceSearchRequest = {
-        location: new google.maps.LatLng(location.lat, location.lng),
+        location: new window.google.maps.LatLng(location.lat, location.lng),
         radius: radius,
         type: 'restaurant',
         keyword: '음식점'
       };
 
-      this.service.nearbySearch(request, (results, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-          const count = results.filter(place => place.rating && place.rating > 3.5).length;
+      this.service.nearbySearch(request, (results: google.maps.places.PlaceResult[] | null, status: google.maps.places.PlacesServiceStatus) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
+          const count = results.filter((place: google.maps.places.PlaceResult) => place.rating && place.rating > 3.5).length;
           resolve(count);
         } else {
           resolve(0);
@@ -224,7 +227,7 @@ export class PlacesService {
 
   async getPlaceDetails(placeId: string): Promise<google.maps.places.PlaceResult | null> {
     return new Promise((resolve, reject) => {
-      if (!this.service) {
+      if (!this.service || !window.google) {
         reject('Places service not initialized');
         return;
       }
@@ -234,8 +237,8 @@ export class PlacesService {
         fields: ['name', 'rating', 'photos', 'formatted_address', 'formatted_phone_number', 'website', 'opening_hours']
       };
 
-      this.service.getDetails(request, (place, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+      this.service.getDetails(request, (place: google.maps.places.PlaceResult | null, status: google.maps.places.PlacesServiceStatus) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
           resolve(place);
         } else {
           reject(`Place details failed: ${status}`);
@@ -273,7 +276,7 @@ export const getCurrentLocation = (): Promise<LocationData> => {
 
 export const loadGoogleMapsAPI = (): Promise<void> => {
   return new Promise((resolve, reject) => {
-    if (typeof google !== 'undefined' && google.maps) {
+    if (typeof window !== 'undefined' && window.google && window.google.maps) {
       resolve();
       return;
     }
