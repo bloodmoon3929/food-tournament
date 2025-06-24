@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Trophy, RotateCcw, Star, MapPin, ChefHat, Clock, Eye, EyeOff } from 'lucide-react';
+import { Trophy, RotateCcw, Star, MapPin, Clock, ChefHat } from 'lucide-react';
 import { Restaurant } from '@/lib/types';
 import { TournamentSkeleton } from './SkeletonLoader';
 import Image from 'next/image';
@@ -20,7 +20,6 @@ export default function Tournament({ restaurants, tournamentSize, onRestart }: T
   const [pairIndex, setPairIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [winners, setWinners] = useState<Restaurant[]>([]);
-  const [showMenuPreview, setShowMenuPreview] = useState<string | null>(null); // 메뉴 미리보기 상태
 
   // 토너먼트 초기화
   useEffect(() => {
@@ -109,8 +108,6 @@ export default function Tournament({ restaurants, tournamentSize, onRestart }: T
         </div>
       );
     }
-
-    const isMenuVisible = showMenuPreview === restaurant.id;
 
     return (
       <div className="space-y-3 relative">
@@ -238,77 +235,7 @@ export default function Tournament({ restaurants, tournamentSize, onRestart }: T
           </div>
         </div>
 
-        {/* 카드 아래 메뉴 보기 버튼 */}
-        {restaurant.menu?.sample_menu && restaurant.menu.sample_menu.length > 0 && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowMenuPreview(isMenuVisible ? null : restaurant.id);
-            }}
-            className={`w-full py-3 px-4 rounded-xl text-sm font-medium transition-all duration-200 
-                       flex items-center justify-center space-x-2 border-2 btn-mobile touch-manipulation
-                       ${isMenuVisible 
-                         ? 'bg-red-500/20 border-red-400/50 text-red-300 hover:bg-red-500/30 hover:border-red-400/70' 
-                         : 'bg-blue-500/20 border-blue-400/50 text-blue-300 hover:bg-blue-500/30 hover:border-blue-400/70'}
-                       hover:scale-105`}
-          >
-            {isMenuVisible ? (
-              <>
-                <EyeOff className="w-4 h-4" />
-                <span>메뉴 닫기</span>
-              </>
-            ) : (
-              <>
-                <Eye className="w-4 h-4" />
-                <span>메뉴 전체 보기</span>
-              </>
-            )}
-          </button>
-        )}
-
-        {/* 메뉴 미리보기 오버레이 */}
-        {isMenuVisible && restaurant.menu?.sample_menu && (
-          <div className="absolute inset-0 bg-black/90 rounded-2xl z-30 p-4 flex flex-col justify-center">
-            <div className="text-center">
-              <h4 className="text-white font-bold mb-1 flex items-center justify-center space-x-2">
-                <ChefHat className="w-5 h-5 text-orange-400" />
-                <span className="text-lg">{restaurant.name}</span>
-              </h4>
-              <p className="text-white/70 text-sm mb-4">메뉴 미리보기</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6 max-h-32 overflow-y-auto custom-scrollbar">
-                {restaurant.menu.sample_menu.map((item, index) => (
-                  <div key={index} className="bg-white/20 rounded-lg p-3 backdrop-blur-sm border border-white/10">
-                    <span className="text-white text-sm font-medium">{item}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowMenuPreview(null);
-                    onClick();
-                  }}
-                  className="bg-gradient-to-r from-pink-500 to-violet-500 hover:from-pink-600 hover:to-violet-600 
-                           text-white px-6 py-3 rounded-lg text-sm font-bold transition-all duration-200
-                           flex items-center justify-center space-x-2 hover:scale-105"
-                >
-                  <span>🏆 이 맛집 선택!</span>
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowMenuPreview(null);
-                  }}
-                  className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg text-sm font-bold 
-                           transition-all duration-200 flex items-center justify-center space-x-2 hover:scale-105"
-                >
-                  <span>🔙 다시 비교하기</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* 메뉴 정보가 없으므로 버튼 제거 - 기본 정보만 표시 */}
       </div>
     );
   };
