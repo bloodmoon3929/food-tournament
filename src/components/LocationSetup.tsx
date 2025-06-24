@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { MapPin, Search, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Restaurant, LocationData } from '@/lib/types';
-import { PlacesService, getCurrentLocation, loadGoogleMapsAPI } from '@/lib/places';
+import { getCurrentLocation, loadGoogleMapsAPI, RealMenuPlacesService } from '@/lib/real-menu-places';
+import { PlacesService } from '@/lib/places';
 
 interface LocationSetupProps {
   onRestaurantsFound: (restaurants: Restaurant[], tournamentSize: number) => void;
@@ -103,9 +104,9 @@ export default function LocationSetup({ onRestaurantsFound }: LocationSetupProps
     setError(null);
 
     try {
-      // 주변 음식점 검색
-      const placesService = new PlacesService();
-      const restaurants = await placesService.findNearbyRestaurants(currentLocation, radius);
+      // 주변 음식점 검색 - 실제 메뉴만 보여주는 서비스 사용
+      const realMenuPlacesService = new RealMenuPlacesService();
+      const restaurants = await realMenuPlacesService.findNearbyRestaurants(currentLocation, radius);
       
       if (restaurants.length === 0) {
         throw new Error('주변에 음식점을 찾을 수 없습니다. 반경을 늘려보세요.');
