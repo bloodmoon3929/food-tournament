@@ -6,7 +6,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
 
 현재 위치 기반으로 주변 맛집들을 찾아서 이상형 월드컵을 진행하는 Next.js 웹 애플리케이션입니다.
-
+ 
 ## ✨ 주요 기능
 
 - 📍 **현재 위치 기반 맛집 검색**: GPS를 이용한 정확한 위치 파악
