@@ -68,6 +68,21 @@ yarn dev
 3. API 키 생성 및 도메인 제한 설정
 4. 환경 변수 파일에 키 추가
 
+### 맛집 판정 기준
+
+별점만 보면 "5.0 (리뷰 2개)"가 "4.4 (리뷰 1,200개)"보다 위에 옵니다. 그래서 `src/lib/ranking.ts`에서
+
+1. **리뷰 10개 이상 · 별점 3.5 초과**인 곳만 후보로 남기고
+2. 리뷰 수를 반영한 **베이지안 평균 점수**로 줄을 세웁니다.
+   `점수 = (리뷰수 × 별점 + 30 × 주변 평균별점) / (리뷰수 + 30)`
+   리뷰가 적을수록 주변 평균 쪽으로 보정되고, 많을수록 실제 별점에 가까워집니다.
+3. 점수 상위 N곳으로 N강 대진을 만듭니다. 네이버에서만 찾은 곳(별점 없음)은 자리가 모자랄 때만 들어갑니다.
+
+### 리뷰 분석
+
+카드의 **리뷰 분석** 버튼이나 우승 화면에서 Google 리뷰(최대 5개)와 네이버 블로그 후기(최대 10개)를 모아 분석합니다.
+프록시에 리뷰 AI가 설정되어 있으면 AI 요약, 없으면 키워드 기반으로 장점/단점/자주 나온 메뉴/긍정 비율을 보여줍니다.
+
 ### 맛집 검색 방식 (20개 제한 해결)
 
 예전에는 Google Places `nearbySearch`를 한 번만 호출해서 **반경과 상관없이 최대 20개**까지만 검색됐습니다.
@@ -80,21 +95,25 @@ yarn dev
 
 검색 결과는 반경을 바꿀 때 한 번만 가져와서 개수 표시와 토너먼트 시작에 그대로 재사용합니다.
 
-### 네이버 검색 프록시 설정 (선택)
+### API 프록시 설정 (선택: 네이버 검색 · 리뷰 AI 분석)
 
 네이버 검색 API는 Client Secret이 필요하고 브라우저 CORS를 허용하지 않아 GitHub Pages에서 직접 부를 수 없습니다.
-`naver-proxy/`의 Cloudflare Worker를 배포해서 사용합니다. 설정하지 않으면 Google 검색만 사용합니다.
+`proxy/`의 Cloudflare Worker를 배포해서 사용합니다. 설정하지 않으면 Google 검색과 키워드 기반 리뷰 분석만 사용합니다.
 
 ```bash
-cd naver-proxy
+cd proxy
 npx wrangler secret put NAVER_CLIENT_ID
 npx wrangler secret put NAVER_CLIENT_SECRET
+npx wrangler secret put REVIEW_AI_KEY   # 리뷰 분석 AI 키
 npx wrangler deploy
 ```
 
+- 리뷰 AI는 `wrangler.toml`의 `REVIEW_AI_URL`(OpenAI 호환 Chat Completions 주소)과 `REVIEW_AI_MODEL`을 채워야 켜집니다.
+- 로컬 개발은 `proxy/.dev.vars`에 키를 넣고 `npx wrangler dev` (git에서 제외됨, `.dev.vars.example` 참고).
+
 - `wrangler.toml`의 `ALLOWED_ORIGINS`에 사이트 주소를 넣어주세요.
 - 배포된 Worker 주소를 GitHub 리포지토리 **Settings > Secrets and variables > Actions > Variables**에
-  `NEXT_PUBLIC_NAVER_PROXY_URL`로 등록합니다 (로컬은 `.env.local`).
+  `NEXT_PUBLIC_PROXY_URL`로 등록합니다 (로컬은 `.env.local`).
 - 동네 이름을 얻기 위해 Google **Geocoding API**도 활성화해야 합니다.
 
 ### API 사용량 최적화
@@ -105,16 +124,26 @@ npx wrangler deploy
 
 ## 🌟 주요 컴포넌트
 
-- `LocationSetup`: 위치 설정 및 맛집 검색
-- `Tournament`: 토너먼트 진행 및 결과 표시
-- `PlacesService`: Google Places API 래퍼 클래스
+```
+src/
+  app/                 page.tsx (화면 전환), layout.tsx, globals.css (색상 토큰, 다크 모드)
+  components/
+    setup/             LocationSetup, LocationField, RadiusSlider, BracketPicker, SearchSummary
+    tournament/        Tournament, RoundHeader, MatchView, RestaurantCard, WinnerView,
+                       ReviewSheet, ReviewAnalysisView, RestaurantPhoto, RestaurantMeta
+    ui/                Button, Spinner
+  hooks/               useTournament (대진 진행), useReviewAnalysis
+  lib/                 restaurant-search (Google+네이버 검색), ranking (맛집 점수), reviews (리뷰 분석),
+                       google-maps, menu-info, proxy, format, types
+proxy/                 Cloudflare Worker (네이버 검색, 리뷰 AI)
+```
 
 ## 🎨 디자인 특징
 
-- **글래스모피즘 효과**: 반투명 배경과 블러 효과
-- **그라디언트**: 핑크-바이올렛 그라디언트 활용
-- **호버 애니메이션**: 카드 확대 및 이미지 줌 효과
-- **반응형**: 모바일 우선 디자인
+- 따뜻한 크림/토마토 색 조합, 시스템 설정에 따른 **다크 모드**
+- Pretendard 글꼴, 모바일 우선 반응형
+- 카드 선택 애니메이션, 키보드 ← → 선택
+- 우승 화면에서 우승까지의 경기 기록, 지도 길찾기, 같은 후보로 다시 하기
 
 ## 📝 TODO
 

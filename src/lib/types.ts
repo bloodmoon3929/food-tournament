@@ -22,6 +22,8 @@ export interface Restaurant {
   source?: 'google' | 'naver';
   /** 검색 중심으로부터의 거리 (m) */
   distance?: number;
+  /** 리뷰 수를 반영한 맛집 점수 (베이지안 평균, lib/ranking.ts) */
+  score?: number;
 }
 
 export interface MenuInfo {

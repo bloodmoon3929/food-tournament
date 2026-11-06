@@ -1,6 +1,9 @@
 /// <reference types="google.maps" />
 import { Restaurant, LocationData } from './types';
-import { extractRealMenuInfo } from './real-menu-places';
+import { extractMenuInfo } from './menu-info';
+import { getPlacesService } from './google-maps';
+import { passesQualityBar, rankRestaurants } from './ranking';
+import { PROXY_URL, isProxyEnabled } from './proxy';
 
 /**
  * Google + 네이버 혼합 맛집 검색
@@ -13,16 +16,15 @@ import { extractRealMenuInfo } from './real-menu-places';
  *
  * 네이버 검색 API 는 Client Secret 이 필요하고 브라우저 CORS 를 허용하지 않아서
  * GitHub Pages 같은 정적 사이트에서 직접 호출할 수 없다. 그래서
- * NEXT_PUBLIC_NAVER_PROXY_URL (naver-proxy/ 의 Cloudflare Worker) 이 설정된 경우에만 사용한다.
+ * NEXT_PUBLIC_PROXY_URL (proxy/ 의 Cloudflare Worker) 이 설정된 경우에만 사용한다.
+ *
+ * 맛집 판정(별점 + 리뷰 수)은 lib/ranking.ts 참고.
  */
 
-const NAVER_PROXY_URL = (process.env.NEXT_PUBLIC_NAVER_PROXY_URL || '').replace(/\/+$/, '');
-
-export const isNaverSearchEnabled = () => NAVER_PROXY_URL.length > 0;
+export const isNaverSearchEnabled = isProxyEnabled;
 
 /** 이만큼 모이면 검색을 더 확장하지 않는다 (최대 토너먼트 64강 + 여유분) */
 const DEFAULT_TARGET = 80;
-const MIN_RATING = 3.5;
 const GOOGLE_MAX_PAGES = 3; // nearbySearch 는 페이지당 20개, 최대 3페이지(60개)
 const NAVER_KEYWORDS = ['맛집', '한식', '중식', '일식', '양식', '분식', '고기'];
 const NAVER_MAX_AREAS = 5;
@@ -166,24 +168,21 @@ const toGoogleRestaurant = (place: google.maps.places.PlaceResult, center: Locat
     geometry: { location },
     opening_hours: place.opening_hours,
     user_ratings_total: place.user_ratings_total,
-    menu: extractRealMenuInfo(place),
+    menu: extractMenuInfo(place),
     source: 'google',
     distance: Math.round(distanceMeters(center, location)),
   };
 };
 
 interface GoogleSearchResult {
-  /** 평점 기준을 통과한 가게 */
+  /** 맛집 기준(별점 + 리뷰 수)을 통과한 가게 */
   kept: Restaurant[];
-  /** 평점 미달로 제외된 가게 (네이버에서 같은 가게가 다시 들어오지 않도록 비교용) */
+  /** 별점/리뷰 수 미달로 제외된 가게 (네이버에서 같은 가게가 다시 들어오지 않도록 비교용) */
   rejected: Restaurant[];
 }
 
 const searchGoogle = async (center: LocationData, radius: number, target: number): Promise<GoogleSearchResult> => {
-  if (typeof window === 'undefined' || !window.google?.maps?.places) {
-    throw new Error('Google Maps API가 준비되지 않았습니다.');
-  }
-  const service = new google.maps.places.PlacesService(document.createElement('div'));
+  const service = getPlacesService();
   const found = new Map<string, Restaurant>();
   const rejected = new Map<string, Restaurant>();
 
@@ -192,7 +191,7 @@ const searchGoogle = async (center: LocationData, radius: number, target: number
       if (!place.place_id || found.has(place.place_id) || rejected.has(place.place_id)) continue;
       const r = toGoogleRestaurant(place, center);
       if (r.distance !== undefined && r.distance > radius) continue;
-      if (!place.rating || place.rating <= MIN_RATING) {
+      if (!passesQualityBar(place.rating, place.user_ratings_total)) {
         rejected.set(place.place_id, r);
         continue;
       }
@@ -230,7 +229,7 @@ const searchGoogle = async (center: LocationData, radius: number, target: number
   }
 
   return {
-    kept: Array.from(found.values()).sort((a, b) => b.rating - a.rating),
+    kept: Array.from(found.values()),
     rejected: Array.from(rejected.values()),
   };
 };
@@ -280,7 +279,7 @@ const reverseGeocodeArea = (location: LocationData): Promise<string | null> =>
 
 const naverLocalSearch = async (query: string): Promise<NaverLocalItem[]> => {
   try {
-    const url = `${NAVER_PROXY_URL}/local?query=${encodeURIComponent(query)}&display=5&sort=comment`;
+    const url = `${PROXY_URL}/local?query=${encodeURIComponent(query)}&display=5&sort=comment`;
     const res = await fetch(url);
     if (!res.ok) return [];
     const data = await res.json();
@@ -377,7 +376,7 @@ const mergeResults = (googleResult: GoogleSearchResult, naverList: Restaurant[])
 
   const naverOnly: Restaurant[] = [];
   for (const n of naverList) {
-    // Google 에서 평점 미달로 뺀 가게는 네이버로도 다시 넣지 않는다
+    // Google 에서 별점/리뷰 수 미달로 뺀 가게는 네이버로도 다시 넣지 않는다
     if (googleResult.rejected.some((g) => isSame(g, n))) continue;
     const match = googleList.find((g) => isSame(g, n));
     if (match) {
@@ -389,8 +388,7 @@ const mergeResults = (googleResult: GoogleSearchResult, naverList: Restaurant[])
       naverOnly.push(n);
     }
   }
-  naverOnly.sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
-  return [...googleList, ...naverOnly];
+  return rankRestaurants([...googleList, ...naverOnly]);
 };
 
 export async function searchRestaurants(

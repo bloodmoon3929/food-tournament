@@ -39,7 +39,7 @@ jobs:
       run: npm run build
       env:
         NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
-        NEXT_PUBLIC_NAVER_PROXY_URL: ${{ vars.NEXT_PUBLIC_NAVER_PROXY_URL }}
+        NEXT_PUBLIC_PROXY_URL: ${{ vars.NEXT_PUBLIC_PROXY_URL }}
 
   deploy:
     name: Deploy to GitHub Pages
@@ -77,7 +77,7 @@ jobs:
       run: npm run build
       env:
         NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
-        NEXT_PUBLIC_NAVER_PROXY_URL: ${{ vars.NEXT_PUBLIC_NAVER_PROXY_URL }}
+        NEXT_PUBLIC_PROXY_URL: ${{ vars.NEXT_PUBLIC_PROXY_URL }}
 
     - name: Setup Pages
       uses: actions/configure-pages@v4
