@@ -4,6 +4,7 @@ import { extractMenuInfo } from './menu-info';
 import { getPlacesService } from './google-maps';
 import { passesQualityBar, rankRestaurants } from './ranking';
 import { PROXY_URL, isProxyEnabled } from './proxy';
+import { isInKorea } from './region';
 
 /**
  * Google + 네이버 혼합 맛집 검색
@@ -21,7 +22,9 @@ import { PROXY_URL, isProxyEnabled } from './proxy';
  * 맛집 판정(별점 + 리뷰 수)은 lib/ranking.ts 참고.
  */
 
-export const isNaverSearchEnabled = isProxyEnabled;
+/** 네이버 검색은 프록시가 있고, 검색 위치가 한국일 때만 쓴다 (해외에서는 엉뚱한 결과가 나옴) */
+export const isNaverSearchEnabled = (location?: LocationData | null) =>
+  isProxyEnabled() && (!location || isInKorea(location));
 
 /** 이만큼 모이면 검색을 더 확장하지 않는다 (최대 토너먼트 64강 + 여유분) */
 const DEFAULT_TARGET = 80;
@@ -326,7 +329,7 @@ const toNaverRestaurant = (item: NaverLocalItem, location: LocationData, center:
 };
 
 const searchNaver = async (center: LocationData, radius: number): Promise<Restaurant[]> => {
-  if (!isNaverSearchEnabled()) return [];
+  if (!isNaverSearchEnabled(center)) return [];
 
   // 검색 구역 중심들의 동네 이름 수집
   const points = buildSearchCells(center, radius).map((c) => c.location);
