@@ -119,7 +119,7 @@ export default function LocationSetup({ onStart }: Props) {
             stats={stats}
             error={error}
             bracketSize={bracketSize}
-            naverEnabled={isNaverSearchEnabled()}
+            naverEnabled={isNaverSearchEnabled(location)}
           />
         )}
         {!location && error && <p className="text-sm text-bad">{error}</p>}

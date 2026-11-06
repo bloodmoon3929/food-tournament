@@ -2,7 +2,7 @@
 
 import { ExternalLink, Sparkles, Star, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { Restaurant } from '@/lib/types';
-import { ReviewAnalysis, ReviewSnippet } from '@/lib/reviews';
+import { ReviewAnalysis, ReviewSnippet, usesNaverBlog } from '@/lib/reviews';
 import { useReviewAnalysis } from '@/hooks/useReviewAnalysis';
 import { isProxyEnabled } from '@/lib/proxy';
 
@@ -90,7 +90,7 @@ export default function ReviewAnalysisView({ restaurant }: { restaurant: Restaur
           {analysis.engine === 'ai' ? 'Jev 분석' : '키워드 분석'}
         </span>
         <span className="text-muted">
-          Google 리뷰 {counts.google}개{isProxyEnabled() && ` · 블로그 ${counts.naverBlog}개`}
+          Google 리뷰 {counts.google}개{usesNaverBlog(restaurant) && ` · 블로그 ${counts.naverBlog}개`}
         </span>
       </div>
 

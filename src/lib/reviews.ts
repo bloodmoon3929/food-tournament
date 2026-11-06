@@ -2,6 +2,7 @@
 import { Restaurant } from './types';
 import { getPlacesService } from './google-maps';
 import { PROXY_URL, isProxyEnabled } from './proxy';
+import { isInKorea } from './region';
 
 /**
  * 리뷰 분석
@@ -82,8 +83,27 @@ const areaHint = (address: string) => {
   return parts.find((p) => /(구|군|시|동|읍|면)$/.test(p) && p.length > 1) || '';
 };
 
+/** 네이버 블로그 후기를 가져올지: 프록시가 있고 가게가 한국에 있을 때만 */
+export const usesNaverBlog = (restaurant: Restaurant) => isProxyEnabled() && isInKorea(restaurant.geometry.location);
+
+const normalize = (text: string) => text.toLowerCase().replace(/[^0-9a-z가-힣]/g, '');
+
+/**
+ * 가게 이름의 핵심 단어. "홍콩반점 성수점" → "홍콩반점", "타코튜즈데이 성수 본점" → "타코튜즈데이"
+ * 지점명(…점)과 괄호 안 내용은 블로그마다 다르게 쓰므로 뺀다.
+ */
+export const nameCore = (name: string) => {
+  const tokens = name
+    .replace(/\(.*?\)|\[.*?\]/g, ' ')
+    .split(/\s+/)
+    .map(normalize)
+    .filter((t) => t.length > 0 && !/^.{1,6}점$/.test(t));
+  return tokens.find((t) => t.length >= 2) || normalize(name);
+};
+
 const fetchNaverBlogReviews = async (restaurant: Restaurant): Promise<ReviewSnippet[]> => {
-  if (!isProxyEnabled()) return [];
+  if (!usesNaverBlog(restaurant)) return [];
+  const core = nameCore(restaurant.name);
   try {
     const query = `${restaurant.name} ${areaHint(restaurant.vicinity)} 후기`.trim();
     const res = await fetch(`${PROXY_URL}/blog?query=${encodeURIComponent(query)}&display=10`);
@@ -97,7 +117,8 @@ const fetchNaverBlogReviews = async (restaurant: Restaurant): Promise<ReviewSnip
         link: item.link,
         when: item.postdate ? `${item.postdate.slice(0, 4)}.${item.postdate.slice(4, 6)}.${item.postdate.slice(6, 8)}` : undefined,
       }))
-      .filter((s) => s.text.length > 10);
+      // 가게 이름이 실제로 나오는 글만 (같은 검색어에 걸린 다른 가게/지역 글 제외)
+      .filter((s) => s.text.length > 10 && core.length >= 2 && normalize(s.text).includes(core));
   } catch {
     return [];
   }
