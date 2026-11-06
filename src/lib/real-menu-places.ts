@@ -2,7 +2,7 @@
 import { Restaurant, LocationData, MenuInfo } from './types';
 
 // 실제 구글 메뉴 정보만 추출하는 함수
-const extractRealMenuInfo = (place: google.maps.places.PlaceResult): MenuInfo => {
+export const extractRealMenuInfo = (place: google.maps.places.PlaceResult): MenuInfo => {
   const categories: string[] = [];
   const cuisineTypes: string[] = [];
   

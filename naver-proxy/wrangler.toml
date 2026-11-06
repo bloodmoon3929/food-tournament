@@ -1,0 +1,10 @@
+name = "food-tournament-naver-proxy"
+main = "worker.js"
+compatibility_date = "2024-09-01"
+
+[vars]
+ALLOWED_ORIGINS = "https://bloodmoon3929.github.io,http://localhost:3000"
+
+# 키는 커밋하지 말고 secret 으로 등록:
+#   npx wrangler secret put NAVER_CLIENT_ID
+#   npx wrangler secret put NAVER_CLIENT_SECRET

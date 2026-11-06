@@ -148,12 +148,20 @@ export default function Tournament({ restaurants, tournamentSize, onRestart }: T
             </h3>
             
             <div className="flex items-center justify-center space-x-3 sm:space-x-4 text-sm text-white/80 mb-2 sm:mb-3">
-              <div className="flex items-center space-x-1">
-                <Star className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400 fill-current" />
-                <span className="text-xs sm:text-sm">{restaurant.rating?.toFixed(1) || '0.0'}</span>
-              </div>
-              {restaurant.user_ratings_total && (
-                <span className="text-xs sm:text-sm">({restaurant.user_ratings_total})</span>
+              {restaurant.source === 'naver' ? (
+                <span className="text-xs sm:text-sm px-2 py-0.5 rounded-full bg-green-500/30 text-green-200">
+                  네이버 검색
+                </span>
+              ) : (
+                <>
+                  <div className="flex items-center space-x-1">
+                    <Star className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400 fill-current" />
+                    <span className="text-xs sm:text-sm">{restaurant.rating?.toFixed(1) || '0.0'}</span>
+                  </div>
+                  {restaurant.user_ratings_total && (
+                    <span className="text-xs sm:text-sm">({restaurant.user_ratings_total})</span>
+                  )}
+                </>
               )}
             </div>
 

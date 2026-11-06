@@ -1,14 +1,22 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { MapPin, Search, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Restaurant, LocationData } from '@/lib/types';
-import { getCurrentLocation, loadGoogleMapsAPI, RealMenuPlacesService } from '@/lib/real-menu-places';
-import { PlacesService } from '@/lib/places';
+import { getCurrentLocation, loadGoogleMapsAPI } from '@/lib/real-menu-places';
+import { searchRestaurants, isNaverSearchEnabled, SearchStats } from '@/lib/restaurant-search';
 
 interface LocationSetupProps {
   onRestaurantsFound: (restaurants: Restaurant[], tournamentSize: number) => void;
 }
+
+const tournamentOptions = [
+  { value: 4, label: '4강 (4개 맛집)' },
+  { value: 8, label: '8강 (8개 맛집)' },
+  { value: 16, label: '16강 (16개 맛집)' },
+  { value: 32, label: '32강 (32개 맛집)' },
+  { value: 64, label: '64강 (64개 맛집)' }
+];
 
 export default function LocationSetup({ onRestaurantsFound }: LocationSetupProps) {
   const [loading, setLoading] = useState(false);
@@ -16,77 +24,67 @@ export default function LocationSetup({ onRestaurantsFound }: LocationSetupProps
   const [radius, setRadius] = useState(1000);
   const [tournamentSize, setTournamentSize] = useState(8);
   const [currentLocation, setCurrentLocation] = useState<LocationData | null>(null);
-  const [restaurantCount, setRestaurantCount] = useState<number | null>(null);
+  const [foundRestaurants, setFoundRestaurants] = useState<Restaurant[] | null>(null);
+  const [searchStats, setSearchStats] = useState<SearchStats | null>(null);
   const [checkingCount, setCheckingCount] = useState(false);
   const [apiReady, setApiReady] = useState(false);
+  // 반경을 빠르게 바꿀 때 이전 검색 결과가 늦게 도착해서 덮어쓰지 않도록
+  const searchSeq = useRef(0);
 
-  const tournamentOptions = [
-    { value: 4, label: '4강 (4개 맛집)' },
-    { value: 8, label: '8강 (8개 맛집)' },
-    { value: 16, label: '16강 (16개 맛집)' },
-    { value: 32, label: '32강 (32개 맛집)' },
-    { value: 64, label: '64강 (64개 맛집)' }
-  ];
+  const restaurantCount = foundRestaurants ? foundRestaurants.length : null;
 
   // API 초기화 및 위치 가져오기
   useEffect(() => {
     const initializeLocation = async () => {
       try {
-        // Google Maps API 로드
         await loadGoogleMapsAPI();
         setApiReady(true);
-        
-        // 현재 위치 가져오기
         const location = await getCurrentLocation();
         setCurrentLocation(location);
-        
-        // 초기 음식점 수 확인
-        await checkRestaurantCount(location, radius);
       } catch (err) {
-        setError(err instanceof Error ? err.message : '위치를 가져올 수 없습니다.');
+        setError(err instanceof Error ? err.message : typeof err === 'string' ? err : '위치를 가져올 수 없습니다.');
       }
     };
 
     initializeLocation();
   }, []);
 
-  // 음식점 수 확인 함수
-  const checkRestaurantCount = useCallback(async (location: LocationData, currentRadius: number) => {
-    if (!apiReady) return;
-    
+  // 맛집 검색 (Google 여러 구역 + 네이버). 결과는 토너먼트 시작 때 그대로 재사용한다.
+  const runSearch = useCallback(async (location: LocationData, currentRadius: number) => {
+    const seq = ++searchSeq.current;
     setCheckingCount(true);
     setError(null);
-    
-    try {
-      const placesService = new PlacesService();
-      const count = await placesService.getRestaurantCount(location, currentRadius);
-      setRestaurantCount(count);
-      
-      // 현재 선택된 토너먼트 크기가 가능한 음식점 수보다 크면 조정
-      if (count < tournamentSize) {
-        const availableSizes = tournamentOptions.filter(option => option.value <= count);
-        if (availableSizes.length > 0) {
-          setTournamentSize(availableSizes[availableSizes.length - 1].value);
-        }
-      }
-    } catch (err) {
-      setError('음식점 수를 확인할 수 없습니다.');
-      setRestaurantCount(null);
-    } finally {
-      setCheckingCount(false);
-    }
-  }, [apiReady, tournamentSize, tournamentOptions]);
 
-  // 반경 변경시 음식점 수 재확인
-  useEffect(() => {
-    if (currentLocation && apiReady) {
-      const timeoutId = setTimeout(() => {
-        checkRestaurantCount(currentLocation, radius);
-      }, 500); // 0.5초 디바운스
-      
-      return () => clearTimeout(timeoutId);
+    try {
+      const { restaurants, stats } = await searchRestaurants(location, currentRadius);
+      if (seq !== searchSeq.current) return;
+      setFoundRestaurants(restaurants);
+      setSearchStats(stats);
+
+      // 현재 선택된 토너먼트 크기가 가능한 음식점 수보다 크면 조정
+      setTournamentSize((size) => {
+        if (restaurants.length >= size) return size;
+        const available = tournamentOptions.filter((option) => option.value <= restaurants.length);
+        return available.length > 0 ? available[available.length - 1].value : size;
+      });
+    } catch (err) {
+      if (seq !== searchSeq.current) return;
+      setError(err instanceof Error ? err.message : '음식점 수를 확인할 수 없습니다.');
+      setFoundRestaurants(null);
+      setSearchStats(null);
+    } finally {
+      if (seq === searchSeq.current) setCheckingCount(false);
     }
-  }, [radius, currentLocation, apiReady, checkRestaurantCount]);
+  }, []);
+
+  // 위치/반경 변경시 재검색 (디바운스)
+  useEffect(() => {
+    if (!currentLocation || !apiReady) return;
+    const timeoutId = setTimeout(() => {
+      runSearch(currentLocation, radius);
+    }, 700);
+    return () => clearTimeout(timeoutId);
+  }, [radius, currentLocation, apiReady, runSearch]);
 
   // 가능한 토너먼트 옵션 필터링
   const getAvailableTournamentOptions = () => {
@@ -94,36 +92,25 @@ export default function LocationSetup({ onRestaurantsFound }: LocationSetupProps
     return tournamentOptions.filter(option => option.value <= restaurantCount);
   };
 
-  const handleFindRestaurants = async () => {
+  const handleFindRestaurants = () => {
     if (!currentLocation || !apiReady) {
       setError('위치 정보가 준비되지 않았습니다.');
+      return;
+    }
+    if (!foundRestaurants || foundRestaurants.length === 0) {
+      setError('주변에 음식점을 찾을 수 없습니다. 반경을 늘려보세요.');
+      return;
+    }
+    if (foundRestaurants.length < tournamentSize) {
+      setError(`${tournamentSize}강을 진행하기에 음식점이 부족합니다. (필요: ${tournamentSize}개, 발견: ${foundRestaurants.length}개)\n반경을 늘리거나 토너먼트 규모를 줄여보세요.`);
       return;
     }
 
     setLoading(true);
     setError(null);
-
-    try {
-      // 주변 음식점 검색 - 실제 메뉴만 보여주는 서비스 사용
-      const realMenuPlacesService = new RealMenuPlacesService();
-      const restaurants = await realMenuPlacesService.findNearbyRestaurants(currentLocation, radius);
-      
-      if (restaurants.length === 0) {
-        throw new Error('주변에 음식점을 찾을 수 없습니다. 반경을 늘려보세요.');
-      }
-
-      if (restaurants.length < tournamentSize) {
-        throw new Error(`${tournamentSize}강을 진행하기에 음식점이 부족합니다. (필요: ${tournamentSize}개, 발견: ${restaurants.length}개)\n반경을 늘리거나 토너먼트 규모를 줄여보세요.`);
-      }
-
-      // 선택된 토너먼트 크기만큼 음식점 선별
-      const selectedRestaurants = restaurants.slice(0, tournamentSize);
-      onRestaurantsFound(selectedRestaurants, tournamentSize);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '오류가 발생했습니다.');
-    } finally {
-      setLoading(false);
-    }
+    // 전체 목록을 넘기면 Tournament 에서 섞어서 tournamentSize 만큼 뽑는다 (Google/네이버 혼합)
+    onRestaurantsFound(foundRestaurants, tournamentSize);
+    setLoading(false);
   };
 
   return (
@@ -161,13 +148,19 @@ export default function LocationSetup({ onRestaurantsFound }: LocationSetupProps
                     <span className="text-blue-200 font-bold ml-1">{restaurantCount}개</span>
                   </span>
                   <button
-                    onClick={() => currentLocation && checkRestaurantCount(currentLocation, radius)}
+                    onClick={() => currentLocation && runSearch(currentLocation, radius)}
                     className="text-blue-400 hover:text-blue-300 transition-colors"
                     disabled={checkingCount}
                   >
                     <RefreshCw className="w-3 h-3" />
                   </button>
                 </div>
+                {searchStats && (
+                  <div className="text-white/50 text-xs mt-1">
+                    Google {searchStats.google}개
+                    {isNaverSearchEnabled() && <> · 네이버 추가 {searchStats.naver}개</>}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex items-center justify-center space-x-2 text-amber-400 text-sm">
@@ -269,13 +262,13 @@ export default function LocationSetup({ onRestaurantsFound }: LocationSetupProps
         {/* 검색 버튼 */}
         <button
           onClick={handleFindRestaurants}
-          disabled={loading || !apiReady || !currentLocation || (restaurantCount !== null && restaurantCount < tournamentSize)}
+          disabled={loading || checkingCount || !apiReady || !currentLocation || restaurantCount === null || restaurantCount < tournamentSize}
           className="w-full bg-gradient-to-r from-pink-500 to-violet-500 hover:from-pink-600 hover:to-violet-600 
                    text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 
                    disabled:opacity-50 disabled:cursor-not-allowed card-hover transform hover:scale-105
                    disabled:transform-none"
         >
-          {loading ? (
+          {loading || checkingCount ? (
             <div className="flex items-center justify-center space-x-2">
               <Loader2 className="w-5 h-5 animate-spin" />
               <span>음식점을 찾는 중...</span>

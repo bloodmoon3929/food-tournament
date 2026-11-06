@@ -53,7 +53,7 @@ yarn dev
 ## 📱 사용 방법
 
 1. **위치 허용**: 브라우저에서 위치 접근 권한을 허용해주세요
-2. **반경 설정**: 검색할 반경을 조절하세요 (500m ~ 5km)
+2. **반경 설정**: 검색할 반경을 조절하세요 (500m ~ 10km)
 3. **맛집 검색**: "주변 맛집 찾기" 버튼을 클릭하세요
 4. **토너먼트 시작**: 두 맛집 중 하나를 선택하며 진행하세요
 5. **결과 확인**: 최종 우승 맛집을 확인하고 방문해보세요!
@@ -68,9 +68,39 @@ yarn dev
 3. API 키 생성 및 도메인 제한 설정
 4. 환경 변수 파일에 키 추가
 
+### 맛집 검색 방식 (20개 제한 해결)
+
+예전에는 Google Places `nearbySearch`를 한 번만 호출해서 **반경과 상관없이 최대 20개**까지만 검색됐습니다.
+지금은 `src/lib/restaurant-search.ts`에서 다음과 같이 검색합니다.
+
+1. **Google 페이지네이션**: 한 번의 검색에서 다음 페이지까지 받아 최대 60개
+2. **구역 분할 검색**: 반경이 1km보다 크면 바깥 6방향 + 중심 소구역으로 나눠 추가 검색 (충분히 모이면 중단)
+3. **네이버 지역 검색 보충 (선택)**: 주변 동네 이름 × 음식 키워드(맛집/한식/중식/일식/양식/분식/고기)로 검색해서
+   Google에 없는 가게를 추가합니다. 같은 가게(200m 이내 + 이름 일치)는 Google 정보를 쓰고 네이버 카테고리만 붙입니다.
+
+검색 결과는 반경을 바꿀 때 한 번만 가져와서 개수 표시와 토너먼트 시작에 그대로 재사용합니다.
+
+### 네이버 검색 프록시 설정 (선택)
+
+네이버 검색 API는 Client Secret이 필요하고 브라우저 CORS를 허용하지 않아 GitHub Pages에서 직접 부를 수 없습니다.
+`naver-proxy/`의 Cloudflare Worker를 배포해서 사용합니다. 설정하지 않으면 Google 검색만 사용합니다.
+
+```bash
+cd naver-proxy
+npx wrangler secret put NAVER_CLIENT_ID
+npx wrangler secret put NAVER_CLIENT_SECRET
+npx wrangler deploy
+```
+
+- `wrangler.toml`의 `ALLOWED_ORIGINS`에 사이트 주소를 넣어주세요.
+- 배포된 Worker 주소를 GitHub 리포지토리 **Settings > Secrets and variables > Actions > Variables**에
+  `NEXT_PUBLIC_NAVER_PROXY_URL`로 등록합니다 (로컬은 `.env.local`).
+- 동네 이름을 얻기 위해 Google **Geocoding API**도 활성화해야 합니다.
+
 ### API 사용량 최적화
 - 검색 결과를 평점 3.5 이상으로 필터링
-- 최대 16개 맛집으로 제한
+- 구역 분할 검색은 맛집이 충분히 모이면 중단
+- 장소 상세(getDetails) 호출 제거
 - 이미지 크기 최적화 (400x400)
 
 ## 🌟 주요 컴포넌트

@@ -18,6 +18,10 @@ export interface Restaurant {
   user_ratings_total?: number;
   menu?: MenuInfo;
   reviews?: Review[];
+  /** 데이터 출처 (google: Places API, naver: 네이버 지역 검색) */
+  source?: 'google' | 'naver';
+  /** 검색 중심으로부터의 거리 (m) */
+  distance?: number;
 }
 
 export interface MenuInfo {
