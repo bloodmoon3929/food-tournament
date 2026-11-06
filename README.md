@@ -118,6 +118,10 @@ npx wrangler deploy
 
 - 로컬 개발은 `proxy/.dev.vars`에 키를 넣고 `npx wrangler dev` (git에서 제외됨, `.dev.vars.example` 참고).
 
+**컴퓨터 없이 (GitHub Actions로 배포)**: 저장소 Secrets에 `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`,
+`TYPESAFE_API_KEY`(선택), `NAVER_CLIENT_ID`/`NAVER_CLIENT_SECRET`(선택)을 등록하고
+Actions → **Deploy API proxy** → Run workflow. 실행 결과 요약에 Worker 주소가 나옵니다.
+
 - `wrangler.toml`의 `ALLOWED_ORIGINS`에 사이트 주소를 넣어주세요.
 - 배포된 Worker 주소를 GitHub 리포지토리 **Settings > Secrets and variables > Actions > Variables**에
   `NEXT_PUBLIC_PROXY_URL`로 등록합니다 (로컬은 `.env.local`).
