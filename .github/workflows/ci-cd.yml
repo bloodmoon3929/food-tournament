@@ -5,6 +5,8 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
+  # Actions 화면의 "Run workflow" 버튼으로 다시 빌드·배포 (변수를 바꾼 뒤 등)
+  workflow_dispatch:
 
 jobs:
   ci:
@@ -45,7 +47,7 @@ jobs:
     name: Deploy to GitHub Pages
     needs: ci
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     
     permissions:
       contents: read

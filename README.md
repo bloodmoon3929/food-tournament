@@ -125,6 +125,7 @@ Actions → **Deploy API proxy** → Run workflow. 실행 결과 요약에 Worke
 - `wrangler.toml`의 `ALLOWED_ORIGINS`에 사이트 주소를 넣어주세요.
 - 배포된 Worker 주소를 GitHub 리포지토리 **Settings > Secrets and variables > Actions > Variables**에
   `NEXT_PUBLIC_PROXY_URL`로 등록합니다 (로컬은 `.env.local`).
+- 변수를 바꾼 뒤에는 Actions → **CI/CD Pipeline** → **Run workflow**로 다시 배포하세요. (같은 커밋을 Re-run 하면 GitHub Pages가 새 빌드로 바꾸지 않는 경우가 있습니다)
 - 동네 이름을 얻기 위해 Google **Geocoding API**도 활성화해야 합니다.
 
 ### API 사용량 최적화
