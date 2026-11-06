@@ -18,6 +18,12 @@ export interface Restaurant {
   user_ratings_total?: number;
   menu?: MenuInfo;
   reviews?: Review[];
+  /** 데이터 출처 (google: Places API, naver: 네이버 지역 검색) */
+  source?: 'google' | 'naver';
+  /** 검색 중심으로부터의 거리 (m) */
+  distance?: number;
+  /** 리뷰 수를 반영한 맛집 점수 (베이지안 평균, lib/ranking.ts) */
+  score?: number;
 }
 
 export interface MenuInfo {

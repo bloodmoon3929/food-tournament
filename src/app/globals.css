@@ -2,85 +2,62 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  html {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    /* 모바일에서 확대/축소 방지 */
-    -webkit-text-size-adjust: 100%;
-    -ms-text-size-adjust: 100%;
-  }
-  
-  body {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
-    /* 모바일에서 부드러운 스크롤 */
-    -webkit-overflow-scrolling: touch;
-  }
-  
-  /* 모바일에서 터치 하이라이트 제거 */
-  * {
-    -webkit-tap-highlight-color: transparent;
+/* 색상 토큰 (RGB 채널). tailwind.config.js 에서 bg-surface, text-ink 등으로 사용 */
+:root {
+  --c-bg: 250 246 240;
+  --c-surface: 255 255 255;
+  --c-sunken: 243 237 228;
+  --c-ink: 31 26 22;
+  --c-muted: 111 101 91;
+  --c-line: 231 222 210;
+  --c-accent: 228 87 46;
+  --c-accent-strong: 196 66 28;
+  --c-accent-soft: 253 233 225;
+  --c-gold: 230 166 35;
+  --c-good: 46 125 84;
+  --c-bad: 200 60 60;
+  --c-naver: 3 160 70;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --c-bg: 22 19 17;
+    --c-surface: 34 30 27;
+    --c-sunken: 28 25 22;
+    --c-ink: 245 239 231;
+    --c-muted: 170 160 148;
+    --c-line: 58 52 47;
+    --c-accent: 240 112 74;
+    --c-accent-strong: 248 140 106;
+    --c-accent-soft: 64 36 28;
+    --c-gold: 242 186 70;
+    --c-good: 92 184 130;
+    --c-bad: 236 104 104;
+    --c-naver: 52 199 110;
+    color-scheme: dark;
   }
 }
 
-@layer components {
-  .glass-effect {
-    @apply bg-white/10 backdrop-blur-md border border-white/20;
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
   }
-  
-  .card-hover {
-    @apply transition-all duration-300 hover:scale-105 hover:shadow-2xl;
+  body {
+    @apply bg-bg text-ink font-sans antialiased;
+    min-height: 100vh;
+    word-break: keep-all;
   }
-  
-  .gradient-text {
-    @apply bg-gradient-to-r from-pink-500 to-violet-500 bg-clip-text text-transparent;
+  * {
+    -webkit-tap-highlight-color: transparent;
   }
-  
-  /* 모바일 최적화 */
-  .touch-manipulation {
-    touch-action: manipulation;
-  }
-  
-  /* 텍스트 라인 클램프 */
-  .line-clamp-2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  
-  /* 커스텀 스크롤바 (웹킷 기반 브라우저) */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 3px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 3px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.5);
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-bg;
   }
 }
 
 @layer utilities {
-  /* 모바일에서 버튼 크기 최적화 */
-  .btn-mobile {
-    @apply min-h-[44px] min-w-[44px];
-  }
-  
-  /* 안전 영역 고려 (노치가 있는 기기) */
-  .safe-area-top {
-    padding-top: env(safe-area-inset-top);
-  }
-  
-  .safe-area-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
+  .tabular {
+    font-variant-numeric: tabular-nums;
   }
 }
