@@ -1,0 +1,67 @@
+name: Deploy API proxy
+
+# proxy/ (Cloudflare Worker) 배포. 컴퓨터 없이 GitHub 에서 실행할 수 있다.
+# 필요한 저장소 Secrets:
+#   CLOUDFLARE_API_TOKEN   Cloudflare → My Profile → API Tokens → "Edit Cloudflare Workers" 템플릿
+#   CLOUDFLARE_ACCOUNT_ID  Cloudflare 대시보드 → Workers & Pages 화면 오른쪽의 Account ID
+#   TYPESAFE_API_KEY       (선택) Jev 리뷰 분석
+#   NAVER_CLIENT_ID        (선택) 네이버 검색
+#   NAVER_CLIENT_SECRET    (선택)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths: [ 'proxy/**', '.github/workflows/deploy-proxy.yml' ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: proxy
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Check Cloudflare secrets
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID 저장소 Secret 을 먼저 등록하세요."
+            exit 1
+          fi
+
+      - name: Deploy worker
+        run: npx --yes wrangler@3 deploy 2>&1 | tee deploy.log
+
+      - name: Upload secrets
+        env:
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+        run: |
+          for name in TYPESAFE_API_KEY NAVER_CLIENT_ID NAVER_CLIENT_SECRET; do
+            value="${!name}"
+            if [ -n "$value" ]; then
+              printf '%s' "$value" | npx --yes wrangler@3 secret put "$name"
+            else
+              echo "$name 없음 - 건너뜀"
+            fi
+          done
+
+      - name: Show worker URL
+        run: |
+          url=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' deploy.log | head -1)
+          echo "Worker URL: $url"
+          {
+            echo "### 프록시 배포 완료"
+            echo ""
+            echo "저장소 Settings → Secrets and variables → Actions → **Variables** 에"
+            echo "\`NEXT_PUBLIC_PROXY_URL\` = \`$url\` 로 등록한 뒤, CI/CD Pipeline 을 다시 실행하세요."
+          } >> "$GITHUB_STEP_SUMMARY"
