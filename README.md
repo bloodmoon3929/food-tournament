@@ -81,7 +81,15 @@ yarn dev
 ### 리뷰 분석
 
 카드의 **리뷰 분석** 버튼이나 우승 화면에서 Google 리뷰(최대 5개)와 네이버 블로그 후기(최대 10개)를 모아 분석합니다.
-프록시에 리뷰 AI가 설정되어 있으면 AI 요약, 없으면 키워드 기반으로 장점/단점/자주 나온 메뉴/긍정 비율을 보여줍니다.
+
+- 프록시에 `TYPESAFE_API_KEY`가 있으면 [TypeSafe Jev](https://docs.typesafe.ai)로 판정합니다.
+  Jev는 글을 생성하지 않고 질문마다 확률/점수만 돌려주는 모델이라, 한 번의 요청으로
+  - 전체 평가 (4단계 Score) → 긍정 비율
+  - 장점 8개 · 단점 7개 각각 "리뷰에서 명시적으로 언급하나?" (Noul, 0.7 이상이면 표시)
+  - 리뷰에 나온 메뉴 후보 중 추천받는 메뉴 (Noul)
+
+  를 묻고, 요약 문장은 `proxy/worker.js`에서 답을 조합해 만듭니다.
+- 키가 없으면 브라우저에서 키워드 기반으로 같은 항목을 분석합니다.
 
 ### 맛집 검색 방식 (20개 제한 해결)
 
@@ -95,7 +103,7 @@ yarn dev
 
 검색 결과는 반경을 바꿀 때 한 번만 가져와서 개수 표시와 토너먼트 시작에 그대로 재사용합니다.
 
-### API 프록시 설정 (선택: 네이버 검색 · 리뷰 AI 분석)
+### API 프록시 설정 (선택: 네이버 검색 · Jev 리뷰 분석)
 
 네이버 검색 API는 Client Secret이 필요하고 브라우저 CORS를 허용하지 않아 GitHub Pages에서 직접 부를 수 없습니다.
 `proxy/`의 Cloudflare Worker를 배포해서 사용합니다. 설정하지 않으면 Google 검색과 키워드 기반 리뷰 분석만 사용합니다.
@@ -104,11 +112,10 @@ yarn dev
 cd proxy
 npx wrangler secret put NAVER_CLIENT_ID
 npx wrangler secret put NAVER_CLIENT_SECRET
-npx wrangler secret put REVIEW_AI_KEY   # 리뷰 분석 AI 키
+npx wrangler secret put TYPESAFE_API_KEY   # https://console.typesafe.ai/keys
 npx wrangler deploy
 ```
 
-- 리뷰 AI는 `wrangler.toml`의 `REVIEW_AI_URL`(OpenAI 호환 Chat Completions 주소)과 `REVIEW_AI_MODEL`을 채워야 켜집니다.
 - 로컬 개발은 `proxy/.dev.vars`에 키를 넣고 `npx wrangler dev` (git에서 제외됨, `.dev.vars.example` 참고).
 
 - `wrangler.toml`의 `ALLOWED_ORIGINS`에 사이트 주소를 넣어주세요.

@@ -10,7 +10,7 @@ import { PROXY_URL, isProxyEnabled } from './proxy';
  *    - Google 장소 상세의 리뷰 (최대 5개, 별점 포함)
  *    - 네이버 블로그 검색 결과 요약문 (프록시 경유, 최대 10개)
  * 2) 분석
- *    - 프록시에 리뷰 AI 가 설정되어 있으면 AI 요약 (proxy/worker.js 의 /analyze)
+ *    - 프록시에 TypeSafe 키가 있으면 Jev 로 장단점/전체 평가/추천 메뉴 판정 (proxy/worker.js 의 /analyze)
  *    - 아니면(또는 실패하면) 브라우저에서 키워드 기반 분석
  */
 
@@ -239,7 +239,8 @@ interface AiResult {
   sentiment?: ReviewAnalysis['sentiment'];
 }
 
-const analyzeByAi = async (restaurant: Restaurant, snippets: ReviewSnippet[]): Promise<AiResult | null> => {
+/** menus: 리뷰에서 찾은 메뉴 후보. Jev 가 그중 추천받는 메뉴를 고른다 */
+const analyzeByAi = async (restaurant: Restaurant, snippets: ReviewSnippet[], menus: string[]): Promise<AiResult | null> => {
   if (!isProxyEnabled() || snippets.length === 0) return null;
   try {
     const res = await fetch(`${PROXY_URL}/analyze`, {
@@ -249,6 +250,7 @@ const analyzeByAi = async (restaurant: Restaurant, snippets: ReviewSnippet[]): P
         name: restaurant.name,
         address: restaurant.vicinity,
         reviews: snippets.slice(0, 20).map((s) => ({ source: s.source, rating: s.rating, text: s.text.slice(0, 500) })),
+        menus,
       }),
     });
     if (!res.ok) return null;
@@ -265,7 +267,7 @@ const asStrings = (v: unknown, max: number) =>
 export async function analyzeRestaurantReviews(restaurant: Restaurant): Promise<ReviewAnalysis> {
   const snippets = await collectReviews(restaurant);
   const base = analyzeByKeywords(snippets);
-  const ai = await analyzeByAi(restaurant, snippets);
+  const ai = await analyzeByAi(restaurant, snippets, base.keywords);
   if (!ai) return base;
 
   const ratio = typeof ai.positiveRatio === 'number' && ai.positiveRatio >= 0 && ai.positiveRatio <= 1 ? ai.positiveRatio : base.positiveRatio;
@@ -274,8 +276,9 @@ export async function analyzeRestaurantReviews(restaurant: Restaurant): Promise<
     ...base,
     engine: 'ai',
     summary: ai.summary || base.summary,
-    pros: asStrings(ai.pros, 4).length ? asStrings(ai.pros, 4) : base.pros,
-    cons: asStrings(ai.cons, 3).length ? asStrings(ai.cons, 3) : base.cons,
+    // Jev 가 "언급 없음"으로 판정했으면 빈 목록 그대로 둔다 (키워드 분석으로 덮어쓰지 않음)
+    pros: asStrings(ai.pros, 4),
+    cons: asStrings(ai.cons, 3),
     keywords: asStrings(ai.keywords, 6).length ? asStrings(ai.keywords, 6) : base.keywords,
     positiveRatio: ratio,
     sentiment,

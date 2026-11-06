@@ -4,11 +4,10 @@ compatibility_date = "2024-09-01"
 
 [vars]
 ALLOWED_ORIGINS = "https://bloodmoon3929.github.io,http://localhost:3000"
-# 리뷰 분석 AI (OpenAI 호환 Chat Completions 형식). 사용하는 서비스에 맞게 채운다.
-REVIEW_AI_URL = ""
-REVIEW_AI_MODEL = ""
+# 리뷰 분석 모델 (TypeSafe System One)
+TYPESAFE_MODEL = "jev-latest"
 
 # 키는 커밋하지 말고 secret 으로 등록 (로컬 개발은 .dev.vars 파일, git 에서 제외됨):
 #   npx wrangler secret put NAVER_CLIENT_ID
 #   npx wrangler secret put NAVER_CLIENT_SECRET
-#   npx wrangler secret put REVIEW_AI_KEY
+#   npx wrangler secret put TYPESAFE_API_KEY

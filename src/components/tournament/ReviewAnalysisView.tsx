@@ -87,7 +87,7 @@ export default function ReviewAnalysisView({ restaurant }: { restaurant: Restaur
           }`}
         >
           {analysis.engine === 'ai' && <Sparkles className="h-3 w-3" />}
-          {analysis.engine === 'ai' ? 'AI 요약' : '키워드 분석'}
+          {analysis.engine === 'ai' ? 'Jev 분석' : '키워드 분석'}
         </span>
         <span className="text-muted">
           Google 리뷰 {counts.google}개{isProxyEnabled() && ` · 블로그 ${counts.naverBlog}개`}
@@ -145,7 +145,7 @@ export default function ReviewAnalysisView({ restaurant }: { restaurant: Restaur
 
       {!isProxyEnabled() && (
         <p className="text-xs text-muted">
-          네이버 블로그 후기와 AI 요약은 프록시(NEXT_PUBLIC_PROXY_URL)를 설정하면 함께 쓸 수 있어요.
+          네이버 블로그 후기와 Jev 분석은 프록시(NEXT_PUBLIC_PROXY_URL)를 설정하면 함께 쓸 수 있어요.
         </p>
       )}
     </div>
