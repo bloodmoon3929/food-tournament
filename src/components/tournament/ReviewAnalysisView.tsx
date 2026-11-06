@@ -2,7 +2,7 @@
 
 import { ExternalLink, Sparkles, Star, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { Restaurant } from '@/lib/types';
-import { ReviewAnalysis, ReviewSnippet, usesNaverBlog } from '@/lib/reviews';
+import { ReviewAnalysis, ReviewSnippet, isOverseas, usesNaverBlog } from '@/lib/reviews';
 import { useReviewAnalysis } from '@/hooks/useReviewAnalysis';
 import { isProxyEnabled } from '@/lib/proxy';
 
@@ -141,6 +141,12 @@ export default function ReviewAnalysisView({ restaurant }: { restaurant: Restaur
             ))}
           </ul>
         </div>
+      )}
+
+      {usesNaverBlog(restaurant) && isOverseas(restaurant) && (
+        <p className="text-xs text-muted">
+          해외 가게는 가게 이름과 도시 이름이 함께 나온 블로그 글만 골라 썼어요.
+        </p>
       )}
 
       {!isProxyEnabled() && (

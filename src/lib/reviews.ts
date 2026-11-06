@@ -80,45 +80,166 @@ const fetchGoogleReviews = (placeId: string): Promise<ReviewSnippet[]> =>
 /** "서울 강남구 테헤란로 123" → "강남구" 처럼 검색어에 붙일 동네 이름 */
 const areaHint = (address: string) => {
   const parts = address.split(/\s+/);
-  return parts.find((p) => /(구|군|시|동|읍|면)$/.test(p) && p.length > 1) || '';
+  return parts.find((p) => /(구|군|시|동|읍|면)$/.test(p) && p.length > 1 && !/(특별시|광역시|특별자치시)$/.test(p)) || '';
 };
 
-/** 네이버 블로그 후기를 가져올지: 프록시가 있고 가게가 한국에 있을 때만 */
-export const usesNaverBlog = (restaurant: Restaurant) => isProxyEnabled() && isInKorea(restaurant.geometry.location);
+/** 네이버 블로그 후기를 가져올지 (해외 가게도 사용하되, 아래에서 더 엄격하게 거른다) */
+export const usesNaverBlog = (_restaurant?: Restaurant) => isProxyEnabled();
 
-const normalize = (text: string) => text.toLowerCase().replace(/[^0-9a-z가-힣]/g, '');
+/** 해외 가게인지 (블로그 후기를 "이름 + 도시"가 모두 나온 글로만 제한) */
+export const isOverseas = (restaurant: Restaurant) => !isInKorea(restaurant.geometry.location);
+
+/** 비교용 정규화: 소문자, 공백/기호 제거. 한글·영문·숫자·일본어(가나)·한자는 남긴다 */
+export const normalize = (text: string) =>
+  text.toLowerCase().replace(/[^0-9a-z가-힣぀-ヿ㐀-鿿]/g, '');
+
+/** 지점명(…점, …店)과 괄호 안 내용을 뺀 이름 단어들 */
+const nameTokens = (name: string) =>
+  name
+    .replace(/\(.*?\)|\[.*?\]|（.*?）/g, ' ')
+    .split(/\s+/)
+    .map(normalize)
+    .filter((t) => t.length > 0 && !/^.{1,6}[점店]$/.test(t));
 
 /**
  * 가게 이름의 핵심 단어. "홍콩반점 성수점" → "홍콩반점", "타코튜즈데이 성수 본점" → "타코튜즈데이"
- * 지점명(…점)과 괄호 안 내용은 블로그마다 다르게 쓰므로 뺀다.
  */
-export const nameCore = (name: string) => {
-  const tokens = name
-    .replace(/\(.*?\)|\[.*?\]/g, ' ')
+export const nameCore = (name: string) => nameTokens(name).find((t) => t.length >= 2) || normalize(name);
+
+/** 가게 이름 전체 (지점명 제외). "Joe's Pizza" → "joespizza" */
+export const nameFull = (name: string) => nameTokens(name).join('') || normalize(name);
+
+/**
+ * 해외 가게의 도시 이름 후보. 블로그는 한국어(도쿄, 뉴욕)로도 원어(Tokyo)로도 쓰므로 둘 다.
+ * 한국어는 Google 역지오코딩(ko), 원어는 주소의 마지막 부분에서.
+ */
+const overseasCityNames = (restaurant: Restaurant): Promise<string[]> =>
+  new Promise((resolve) => {
+    const names = new Set<string>();
+    const tail = restaurant.vicinity.split(',').pop()?.trim();
+    if (tail && !/\d/.test(tail)) names.add(tail);
+    try {
+      new google.maps.Geocoder().geocode({ location: restaurant.geometry.location, language: 'ko' }, (results, status) => {
+        if (status === google.maps.GeocoderStatus.OK && results) {
+          for (const type of ['locality', 'administrative_area_level_2', 'administrative_area_level_1']) {
+            const comp = results.flatMap((r) => r.address_components).find((c) => c.types.includes(type));
+            if (!comp) continue;
+            names.add(comp.long_name);
+            // "도쿄도" → "도쿄", "시부야구" → "시부야", "뉴욕주" → "뉴욕"
+            const short = comp.long_name.replace(/(도|시|구|현|부|주)$/, '');
+            if (short.length >= 2) names.add(short);
+          }
+        }
+        resolve(Array.from(names).filter((n) => normalize(n).length >= 2));
+      });
+    } catch {
+      resolve(Array.from(names));
+    }
+  });
+
+interface BlogPost {
+  snippet: ReviewSnippet;
+  title: string;
+  body: string;
+}
+
+/** 여행기·목록·일기 글 제목 ("1박3일", "day2", "쇼핑 리스트", "총정리", "3월의 기록" …) */
+const ROUNDUP_TITLE =
+  /여행기|일차|day\s*\d|\d\s*박|쇼핑|리스트|총정리|모음|추천템|코스|일정|브이로그|vlog|가맹점|사용처|기록|일기|일상|순례/i;
+
+/** 음식·맛집 글로 보이는 제목 */
+const FOOD_TITLE =
+  /맛집|후기|리뷰|식당|레스토랑|메뉴|먹|맛|라멘|라면|스시|초밥|우동|소바|야키|돈카츠|규동|이자카야|카페|커피|디저트|빵|베이커리|피자|버거|브런치|팬케이크|다이너|스테이크|바베큐|bbq|타코|쌀국수|딤섬|훠궈|술집|bar|pub/i;
+
+/**
+ * 해외용: 이름이 제목에 있으면 OK.
+ * 본문에만 있으면 제목이 음식 글이고 여행기·목록 글이 아닐 때만 (지나가듯 언급된 글 제외)
+ */
+const isAboutPlace = (post: BlogPost, key: string) => {
+  if (normalize(post.title).includes(key)) return true;
+  return (
+    normalize(post.body).includes(key) &&
+    FOOD_TITLE.test(post.title) &&
+    !ROUNDUP_TITLE.test(post.title) &&
+    !/여행|회차/.test(post.title) // "도쿄 8회차 혼자 여행 후기" 같은 여행기
+  );
+};
+
+/** "홍콩반점0410 성수역점" → ["성수역", "성수"] : 이름에 붙은 지점명 */
+const branchKeys = (name: string) =>
+  name
     .split(/\s+/)
     .map(normalize)
-    .filter((t) => t.length > 0 && !/^.{1,6}점$/.test(t));
-  return tokens.find((t) => t.length >= 2) || normalize(name);
+    .filter((t) => /^.{1,6}[점店]$/.test(t) && !/^본점$/.test(t))
+    .flatMap((t) => {
+      const base = t.replace(/[점店]$/, '');
+      return [base, base.replace(/(역|동|구|시)$/, '')];
+    })
+    .filter((k) => k.length >= 2);
+
+/** "서울 성동구 성수동1가" → ["성동구", "성동", "성수동1가", "성수"] : 주소의 구/동 이름 */
+const districtKeys = (address: string) =>
+  address
+    .split(/\s+/)
+    .map(normalize)
+    .filter((t) => /(구|군|시|동|읍|면|가)$/.test(t) && t.length >= 2 && !/(특별시|광역시|특별자치시)$/.test(t))
+    .flatMap((t) => [t, t.replace(/\d*(가|동|구|군|시|읍|면)$/, '')])
+    .filter((k) => k.length >= 2 && !/^(서울|부산|대구|인천|광주|대전|울산|서울특별|특별)$/.test(k));
+
+const searchBlog = async (query: string): Promise<BlogPost[]> => {
+  const res = await fetch(`${PROXY_URL}/blog?query=${encodeURIComponent(query)}&display=20`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  const items: { title: string; description: string; link: string; postdate?: string }[] = data?.items || [];
+  return items
+    .map((item) => {
+      const title = stripHtml(item.title);
+      const body = stripHtml(item.description);
+      return {
+        title,
+        body,
+        snippet: {
+          source: 'naver-blog' as const,
+          text: `${title} — ${body}`,
+          link: item.link,
+          when: item.postdate ? `${item.postdate.slice(0, 4)}.${item.postdate.slice(4, 6)}.${item.postdate.slice(6, 8)}` : undefined,
+        },
+      };
+    })
+    .filter((p) => p.snippet.text.length > 10);
 };
 
 const fetchNaverBlogReviews = async (restaurant: Restaurant): Promise<ReviewSnippet[]> => {
   if (!usesNaverBlog(restaurant)) return [];
-  const core = nameCore(restaurant.name);
   try {
-    const query = `${restaurant.name} ${areaHint(restaurant.vicinity)} 후기`.trim();
-    const res = await fetch(`${PROXY_URL}/blog?query=${encodeURIComponent(query)}&display=10`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    const items: { title: string; description: string; link: string; postdate?: string }[] = data?.items || [];
-    return items
-      .map((item) => ({
-        source: 'naver-blog' as const,
-        text: `${stripHtml(item.title)} — ${stripHtml(item.description)}`,
-        link: item.link,
-        when: item.postdate ? `${item.postdate.slice(0, 4)}.${item.postdate.slice(4, 6)}.${item.postdate.slice(6, 8)}` : undefined,
-      }))
-      // 가게 이름이 실제로 나오는 글만 (같은 검색어에 걸린 다른 가게/지역 글 제외)
-      .filter((s) => s.text.length > 10 && core.length >= 2 && normalize(s.text).includes(core));
+    if (!isOverseas(restaurant)) {
+      // 국내: 글이 많으니 제목에 가게 이름이 있는 글만.
+      // 이름에 지점명이 있으면(프랜차이즈) 그 지점/동네 이름도 글에 나와야 한다 (다른 지점 글 제외)
+      const core = nameCore(restaurant.name);
+      if (core.length < 2) return [];
+      const branches = branchKeys(restaurant.name);
+      const places = [...branches, ...districtKeys(restaurant.vicinity)];
+      const posts = await searchBlog(`${restaurant.name} ${areaHint(restaurant.vicinity)} 후기`.trim());
+      return posts
+        .filter((p) => normalize(p.title).includes(core) && !ROUNDUP_TITLE.test(p.title))
+        .filter((p) => branches.length === 0 || places.some((k) => normalize(p.snippet.text).includes(k)))
+        .slice(0, 10)
+        .map((p) => p.snippet);
+    }
+
+    // 해외: 가게 이름 전체 + 도시 이름이 모두 나오는 글만
+    // (같은 이름의 다른 도시 지점, 이름만 겹치는 엉뚱한 글 제외)
+    const full = nameFull(restaurant.name);
+    if (full.length < 3) return [];
+    const cities = await overseasCityNames(restaurant);
+    if (cities.length === 0) return [];
+    const cityKeys = cities.map(normalize);
+    const koreanCity = cities.find((c) => /[가-힣]/.test(c)) || cities[0];
+    const posts = await searchBlog(`${restaurant.name} ${koreanCity}`);
+    return posts
+      .filter((p) => isAboutPlace(p, full) && cityKeys.some((c) => normalize(p.snippet.text).includes(c)))
+      .slice(0, 10)
+      .map((p) => p.snippet);
   } catch {
     return [];
   }
