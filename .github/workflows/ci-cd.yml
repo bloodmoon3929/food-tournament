@@ -65,6 +65,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 25
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -91,7 +93,31 @@ jobs:
       with:
         # Next.js 정적 배포 폴더를 지정합니다.
         path: ./out
+        # Re-run 하면 이전 시도의 artifact 가 남아 있어서 이름이 겹치면 배포가 실패한다
+        name: github-pages-${{ github.run_attempt }}
+
+    # 이전 배포가 "진행 중"으로 멈춰 있으면 새 배포가 거부된다
+    # ("due to in progress deployment. Please cancel <sha> first").
+    # 최근 커밋들의 Pages 배포 상태를 보고 끝나지 않은 것만 취소한다.
+    - name: Cancel stuck Pages deployments
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        api="https://api.github.com/repos/${{ github.repository }}/pages/deployments"
+        for sha in $(git rev-list --max-count=20 HEAD~1 2>/dev/null); do
+          status=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "$api/$sha" | jq -r '.status // empty')
+          case "$status" in
+            deployment_queued|deployment_in_progress|syncing_files|finished_file_sync|updating_pages|purging_cdn)
+              echo "cancel $sha ($status)"
+              curl -sS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+                "$api/$sha/cancel" -o /dev/null -w "  -> %{http_code}\n" || true
+              ;;
+          esac
+        done
 
     - name: Deploy to GitHub Pages
       id: deployment
       uses: actions/deploy-pages@v4
+      with:
+        artifact_name: github-pages-${{ github.run_attempt }}
